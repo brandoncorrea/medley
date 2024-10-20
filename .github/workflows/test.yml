@@ -13,6 +13,12 @@ jobs:
           distribution: 'zulu'
           java-version: '8'
 
+      - name: Prepare dotnet
+        uses: xt0rted/setup-dotnet@v1.5.0
+
+      - name: Prepare Clojure CLR
+        run: dotnet tool install --global Clojure.Cljr --version 0.1.0-alpha2
+
       - name: Install clojure tools
         uses: DeLaGuardo/setup-clojure@10.1
         with:
@@ -25,5 +31,8 @@ jobs:
           key: cljdeps-${{ hashFiles('project.clj') }}
           restore-keys: cljdeps-
 
-      - name: Run tests
+      - name: Run clj and cljs tests
         run: lein test-all
+
+      - name: Run cljr tests
+        run: cljr -M -m medley.test-runner
