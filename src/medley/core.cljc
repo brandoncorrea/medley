@@ -2,7 +2,7 @@
   "A small collection of useful, mostly pure functions that might not look out
   of place in the clojure.core namespace."
   (:refer-clojure :exclude [abs boolean? ex-cause ex-message random-uuid regexp?
-                            uuid uuid?]))
+                            uuid uuid? to-array array-list]))
 
 (defn find-first
   "Finds the first item in a collection that matches a predicate. Returns a
@@ -39,6 +39,7 @@
 
 (defn- editable? [coll]
   #?(:clj  (instance? clojure.lang.IEditableCollection coll)
+     :cljr (instance? clojure.lang.IEditableCollection coll)
      :cljs (satisfies? cljs.core/IEditableCollection coll)))
 
 (defn- assoc-some-transient! [m k v]
@@ -103,6 +104,7 @@
   "Create a map entry for a key and value pair."
   [k v]
   #?(:clj  (clojure.lang.MapEntry. k v)
+     :cljr (clojure.lang.MapEntry. k v)
      :cljs (cljs.core/MapEntry. k v nil)))
 
 (defn map-kv
@@ -185,19 +187,22 @@
 (defn queue
   "Creates an empty persistent queue, or one populated with a collection."
   ([] #?(:clj  clojure.lang.PersistentQueue/EMPTY
+         :cljr clojure.lang.PersistentQueue/EMPTY
          :cljs cljs.core/PersistentQueue.EMPTY))
   ([coll] (into (queue) coll)))
 
 (defn queue?
   "Returns true if x implements clojure.lang.PersistentQueue."
   [x]
-  (instance? #?(:clj  clojure.lang.PersistentQueue
+  (instance? #?(:cljr clojure.lang.PersistentQueue
+                :clj  clojure.lang.PersistentQueue
                 :cljs cljs.core/PersistentQueue) x))
 
 (defn boolean?
   "Returns true if x is a boolean."
   [x]
   #?(:clj  (instance? Boolean x)
+     :cljr (instance? Boolean x)
      :cljs (or (true? x) (false? x))))
 
 (defn least
@@ -324,6 +329,9 @@
               (let [k (keyf v)]
                 (assoc! m k #?(:clj  (if-let [kv (find m k)]
                                        (collatef (val kv) v)
+                                       (initf v)) 
+                               :cljr (if-let [kv (find m k)]
+                                       (collatef (val kv) v)
                                        (initf v))
                                :cljs (if (contains? m k)
                                        (collatef (get m k) v)
@@ -446,6 +454,31 @@
   ([pred coll]
    (rest (drop-while (complement pred) coll))))
 
+(defn- add-item [coll item]
+  (#?(:clj  .add 
+      :cljs .add
+      :cljr .Add) coll item))
+
+(defn- clear-list [coll]
+  (#?(:clj  .clear
+      :cljr .Clear
+      :cljs .clear) coll))
+
+(defn- is-empty? [coll]
+  #?(:clj  (.isEmpty coll)
+     :cljr (zero? (.-Count coll))
+     :cljs (.isEmpty coll)))
+
+(defn- to-array [coll]
+  (#?(:clj  .toArray
+      :cljr .ToArray
+      :cljs .toArray) coll))
+
+(defn- array-list []
+  #?(:clj  (java.util.ArrayList.)
+     :cljr (System.Collections.ArrayList.)
+     :cljs (cljs.core/array-list)))
+
 (defn partition-between
   "Applies pred to successive values in coll, splitting it each time `(pred
   prev-item item)` returns logical true. Returns a lazy seq of partitions.
@@ -453,27 +486,28 @@
   {:added "1.7.0"}
   ([pred]
    (fn [rf]
-     (let [part #?(:clj (java.util.ArrayList.) :cljs (array-list))
+     (let [part (array-list)
            prev (volatile! ::none)]
        (fn
          ([] (rf))
          ([result]
-          (rf (if (.isEmpty part)
+          (rf (if (is-empty? part)
                 result
-                (let [v (vec (.toArray part))]
-                  (.clear part)
+                (let [v (vec (to-array part))]
+                  (clear-list part)
                   (unreduced (rf result v))))))
          ([result input]
           (let [p @prev]
             (vreset! prev input)
-            (if (or (#?(:clj identical? :cljs keyword-identical?) p ::none)
+            (if (or (#?(:clj identical? :cljr identical? :cljs keyword-identical?) p ::none)
                     (not (pred p input)))
-              (do (.add part input) result)
-              (let [v (vec (.toArray part))]
-                (.clear part)
+              (do (add-item part input)
+                  result)
+              (let [v (vec (to-array part))]
+                (clear-list part)
                 (let [ret (rf result v)]
                   (when-not (reduced? ret)
-                    (.add part input))
+                    (add-item part input))
                   ret)))))))))
   ([pred coll]
    (lazy-seq
@@ -606,6 +640,11 @@
                 (if (compare-and-set! atom value (f value))
                   value
                   (recur))))
+      :cljr (loop []
+              (let [value @atom]
+                (if (compare-and-set! atom value (f value))
+                  value
+                  (recur))))
       :cljs (let [value @atom]
               (reset! atom (f value))
               value)))
@@ -624,6 +663,7 @@
   Clojure as well as ClojureScript."
   [ex]
   #?(:clj  (when (instance? Throwable ex) (.getMessage ^Throwable ex))
+     :cljr (when (instance? Exception ex) (.-Message ^Exception ex))
      :cljs (cljs.core/ex-message ex)))
 
 (defn ex-cause
@@ -632,18 +672,20 @@
   Clojure as well as ClojureScript."
   [ex]
   #?(:clj  (when (instance? Throwable ex) (.getCause ^Throwable ex))
+     :cljr (when (instance? Exception ex) (.-InnerException ^Exception ex))
      :cljs (cljs.core/ex-cause ex)))
 
 (defn uuid?
   "Returns true if the value is a UUID."
   [x]
-  (instance? #?(:clj java.util.UUID :cljs cljs.core/UUID) x))
+  (instance? #?(:clj java.util.UUID :cljr System.Guid :cljs cljs.core/UUID) x))
 
 (defn uuid
   "Returns a UUID generated from the supplied string. Same as `cljs.core/uuid`
   in ClojureScript, while in Clojure it returns a `java.util.UUID` object."
   [s]
   #?(:clj  (java.util.UUID/fromString s)
+     :cljr (System.Guid. s)
      :cljs (cljs.core/uuid s)))
 
 (defn random-uuid
@@ -651,21 +693,26 @@
   for Clojure as well as ClojureScript."
   []
   #?(:clj  (java.util.UUID/randomUUID)
+     :cljr (System.Guid/NewGuid)
      :cljs (cljs.core/random-uuid)))
 
 (defn regexp?
   "Returns true if the value is a regular expression."
   {:added "1.4.0"}
   [x]
-  (instance? #?(:clj java.util.regex.Pattern :cljs js/RegExp) x))
+  (instance? #?(:clj  java.util.regex.Pattern
+                :cljr System.Text.RegularExpressions.Regex
+                :cljs js/RegExp) x))
 
 (defn index-of
   "Returns the index of the first occurrence of the item in the sequential
   collection coll, or nil if not found."
   {:added "1.9.0"}
-  [^java.util.List coll item]
+  #?(:clj  [^java.util.List coll item]
+     :cljr [^System.Collections.IEnumerable coll item]
+     :cljs [coll item])
   (when (some? coll)
-    (let [index (.indexOf coll item)]
+    (let [index (#?(:clj .indexOf :cljr .IndexOf :cljs .indexOf) coll item)]
       (when-not (neg? index) index))))
 
 (defn find-in

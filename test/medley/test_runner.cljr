@@ -1,0 +1,21 @@
+(ns medley.test-runner
+  (:require [clojure.string :as str]))
+
+(defn test-pair? [[sym]]
+  (str/starts-with? (name sym) "test-"))
+
+(defn test-fns [ns]
+  (->> (ns-interns ns)
+       (filter test-pair?)
+       (map (comp deref second))))
+
+(defn invoke [f] (f))
+
+(defn test-ns [ns]
+  (require ns)
+  (let [tests (test-fns ns)]
+    (run! invoke tests)
+    (println (format "Ran %d tests in %s" (count tests) (str ns)))))
+
+(defn -main []
+  (test-ns 'medley.core-test))
