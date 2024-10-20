@@ -17,7 +17,9 @@ jobs:
         uses: xt0rted/setup-dotnet@v1.5.0
 
       - name: Prepare Clojure CLR
-        run: dotnet tool install --global Clojure.Cljr --version 0.1.0-alpha2
+        run: |
+          dotnet tool install --global Clojure.Main --version 1.12.0-alpha10
+          dotnet tool install --global Clojure.Cljr --version 0.1.0-alpha2
 
       - name: Install clojure tools
         uses: DeLaGuardo/setup-clojure@10.1
