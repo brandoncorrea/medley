@@ -8,7 +8,7 @@
 
 (deftest test-find-first
   (testing "sequences"
-    (is (= (m/find-first even? [7 3 3 2 8]) 2))
+    (is (= (m/find-first even? [7 3 3 2 8 8]) 2))
     (is (nil? (m/find-first even? [7 3 3 7 3]))))
   (testing "transducers"
     (is (= (transduce (m/find-first even?) + 0 [7 3 3 2 8]) 2))
@@ -82,7 +82,7 @@
     (is (= (m/map-kv (fn [k v] (m/map-entry (name k) (inc v))) (->MyRecord 1)) {"x" 2}))))
 
 (deftest test-map-keys
-  (is (= (m/map-keys name {:a 1 :b 2 :c 3})
+  (is (= (m/map-keys name {:a 1 :b 2})
          {"a" 1 "b" 2}))
   (is (= (m/map-keys name (sorted-map :a 1 :b 2))
          (sorted-map "a" 1 "b" 2)))
