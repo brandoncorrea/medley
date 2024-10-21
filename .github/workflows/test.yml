@@ -41,3 +41,4 @@ jobs:
           # This is a hack - cljr aliases don't seem to be working quite right
           echo '{:paths ["src" "test"]}' > deps-clr.edn
           cljr -M -m medley.test-runner
+          exit $(cat tmp/status-clr.txt)

@@ -1,5 +1,6 @@
 (ns medley.test-runner
-  (:require [clojure.test :refer :all]))
+  (:require [clojure.test :refer :all])
+  (:import (System.IO Directory)))
 
 (defn collect-result [results result]
   (merge-with + results result))
@@ -13,6 +14,12 @@
 
 (def test-nses ['medley.core-test])
 
+(defn ensure-dir [path]
+  (when-not (Directory/Exists path)
+    (Directory/CreateDirectory path)))
+
 (defn -main []
-  (let [{:keys [fail error]} (test-results test-nses)]
-    (Environment/Exit (+ fail error))))
+  (let [{:keys [fail error]} (test-results test-nses)
+        failures (+ fail error)]
+    (ensure-dir "tmp")
+    (spit "tmp/status-clr.txt" failures)))
