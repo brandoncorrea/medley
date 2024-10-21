@@ -1,21 +1,18 @@
 (ns medley.test-runner
-  (:require [clojure.string :as str]))
+  (:require [clojure.test :refer :all]))
 
-(defn test-pair? [[sym]]
-  (str/starts-with? (name sym) "test-"))
+(defn collect-result [results result]
+  (merge-with + results result))
 
-(defn test-fns [ns]
-  (->> (ns-interns ns)
-       (filter test-pair?)
-       (map (comp deref second))))
-
-(defn invoke [f] (f))
-
-(defn test-ns [ns]
+(defn run-ns-test [ns]
   (require ns)
-  (let [tests (test-fns ns)]
-    (run! invoke tests)
-    (println (format "Ran %d tests in %s" (count tests) (str ns)))))
+  (test-ns ns))
+
+(defn test-results [nses]
+  (reduce collect-result (map run-ns-test nses)))
+
+(def test-nses ['medley.core-test])
 
 (defn -main []
-  (test-ns 'medley.core-test))
+  (let [{:keys [fail error]} (test-results test-nses)]
+    (Environment/Exit (+ fail error))))
