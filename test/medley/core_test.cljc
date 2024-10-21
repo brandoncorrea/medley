@@ -8,7 +8,7 @@
 
 (deftest test-find-first
   (testing "sequences"
-    (is (= (m/find-first even? [7 3 3 2 8 8]) 2))
+    (is (= (m/find-first even? [7 3 3 2 8]) 2))
     (is (nil? (m/find-first even? [7 3 3 7 3]))))
   (testing "transducers"
     (is (= (transduce (m/find-first even?) + 0 [7 3 3 2 8]) 2))
